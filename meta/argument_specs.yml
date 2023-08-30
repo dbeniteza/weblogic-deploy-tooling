@@ -1,0 +1,39 @@
+argument_specs:
+  main:
+    short_description: This role installs WDT in a remote machine
+    options:
+      github_wdt_base_url:
+        type: "str"
+        required: false
+        description: "GitHub WDT API URL for releases"
+        default: "https://api.github.com/repos/oracle/weblogic-deploy-tooling/releases"
+
+      wdt_version:
+        type: "str"
+        required: false
+        description: "WDT version"
+        default: "latest"
+
+      dest_dir:
+        type: "str"
+        required: false
+        description: "Remote absolute path where the WDT archive should be unpacked"
+        default: "/admin/utils"
+
+      wdt_path:
+        type: "str"
+        required: false
+        description: "WDT installation path after unpack"
+        default: "{{ dest_dir }}/weblogic-deploy"
+
+      user:
+        type: "str"
+        required: false
+        description: "Installation owner username. It must exists on the remote machine"
+        default: "oracle"
+
+      group:
+        type: "str"
+        required: false
+        description: "Installation owner group name. It must exists on the remote machine"
+        default: "oracle"

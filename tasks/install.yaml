@@ -1,0 +1,25 @@
+- name: Install WDT on remote machine
+  become_user: "{{ user }}"
+  block:
+    - name: Install {{ release_name }}
+      ansible.builtin.debug: 
+        msg: ""
+    
+    - name: Unarchive WDT file from URL
+      ansible.builtin.unarchive:
+        src: "{{ download_url }}" # Example: "https://github.com/oracle/weblogic-deploy-tooling/releases/download/release-3.2.2/weblogic-deploy.tar.gz"
+        dest: "{{ dest_dir }}"
+        owner: "{{ user }}"
+        group: "{{ group }}"
+        remote_src: yes    
+      environment:
+        http_proxy: "{{ proxy.http_proxy }}"
+        https_proxy: "{{ proxy.https_proxy }}"
+
+    - name: Set dir permissions
+      ansible.builtin.file:
+        path: '{{ wdt_path }}'
+        owner:  "{{ user }}"
+        group: "{{ group }}"
+        mode: '0755'
+        recurse: yes

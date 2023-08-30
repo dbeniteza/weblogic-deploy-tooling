@@ -1,0 +1,100 @@
+- name: Get WDT release arhive URL
+  become_user: "{{ user }}"
+  block:
+
+    - name: Set GitHub API URL based on WDT version
+      ansible.builtin.set_fact:
+        github_wdt_release_url: "{{ github_wdt_base_url }}/{{ 'latest' if wdt_version == 'latest' or wdt_version == '' else 'tags/' + wdt_version }}"
+        # Example URLs depending on the "wdt_version" variable value
+        # https://api.github.com/repos/oracle/weblogic-deploy-tooling/releases/latest
+        # https://api.github.com/repos/oracle/weblogic-deploy-tooling/releases/tags/release-<version_number>
+
+    - name: Get release
+      ansible.builtin.uri:
+        url: "{{ github_wdt_release_url }}" 
+        method: GET
+        headers:
+          Accept: application/vnd.github.v3+json
+          X-GitHub-Api-Version: "2022-11-28"
+        status_code: 200 # Default value
+      register: release_response
+      environment:
+        http_proxy: "{{ proxy.http_proxy }}"
+        https_proxy: "{{ proxy.https_proxy }}"
+
+    - name: Get download URL and release name from the response
+      ansible.builtin.set_fact:
+        download_url: "{{ release_response.json.assets | selectattr('name', 'equalto', 'weblogic-deploy.tar.gz') | map(attribute='browser_download_url') | list | first }}"
+        release_name: "{{ release_response.json.name }}"
+
+
+- name: Check WDT installation on remote machine
+  become_user: "{{ user }}"
+  block:
+    - name: Check if WDT is installed and which version
+      ansible.builtin.stat:
+        path: "{{wdt_path}}/VERSION.txt"
+      register: file_check
+    
+
+    - name: WDT installation found.
+      become_user: "{{ user }}"
+      block:
+
+        - name: WDT installation found.
+          ansible.builtin.debug: 
+            msg: ""
+
+        - name: Get current WDT version installed
+          ansible.builtin.shell: cat "{{wdt_path}}/VERSION.txt"
+          changed_when: false # without this option the result is changed, even it is just read a file
+          register: file_content
+
+        - name: Compare WDT version found = {{ file_content.stdout.strip() }}. To be installed = {{ release_name }}
+          ansible.builtin.set_fact:
+            is_equal: "{{ file_content.stdout.strip() == release_name }}"
+        
+        - name: Different WDT version.
+          become_user: "{{ user }}"
+          block:
+            - name: Different WDT version.
+              ansible.builtin.debug: 
+                msg: ""
+            - name: Remove current installation at {{wdt_path}}
+              ansible.builtin.file:
+                path: "{{wdt_path}}"
+                state: absent
+            - name: Install {{ release_name }}
+              ansible.builtin.import_tasks: install.yaml
+          when: not is_equal
+
+        - name: Same WDT version. 
+          ansible.builtin.debug:
+            msg: "No actions to be performed. {{ release_name }} already installed"
+          when: is_equal
+
+      when: file_check.stat.exists 
+    
+    - name: WDT installation NOT FOUND. Installing {{ release_name }}
+      become_user: "{{ user }}"
+      block:
+        - name: WDT installation NOT FOUND. Installing {{ release_name }}
+          ansible.builtin.debug: 
+            msg: ""
+        
+        - name: Check {{wdt_path}} directory status
+          ansible.builtin.stat: 
+            path: "{{wdt_path}}"
+          register: status_wdt_path
+        
+        - name: Remove {{wdt_path}}
+          ansible.builtin.file:
+            path: "{{wdt_path}}"
+            state: absent
+          when: status_wdt_path.stat.exists
+
+        - name: Installing {{ release_name }}
+          ansible.builtin.import_tasks: install.yaml
+
+      when: not file_check.stat.exists
+    
